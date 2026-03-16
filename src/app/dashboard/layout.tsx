@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -34,6 +34,40 @@ interface RepStatusInfo {
   isActive: boolean;
 }
 
+// Module-level cache so data survives component remounts during navigation
+let cachedUser: UserInfo | null = null;
+let cachedReps: Rep[] = [];
+let cachedRepStatuses: RepStatusInfo[] = [];
+let userFetchPromise: Promise<void> | null = null;
+let repsFetchPromise: Promise<void> | null = null;
+
+function fetchUserData() {
+  if (!userFetchPromise) {
+    userFetchPromise = fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.id) cachedUser = data;
+      })
+      .catch(() => {});
+  }
+  return userFetchPromise;
+}
+
+function fetchRepsData() {
+  if (!repsFetchPromise) {
+    repsFetchPromise = Promise.all([
+      fetch("/api/reps").then((r) => r.json()),
+      fetch("/api/rep-status").then((r) => r.json()),
+    ])
+      .then(([repsData, statusData]) => {
+        if (Array.isArray(repsData)) cachedReps = repsData;
+        if (Array.isArray(statusData)) cachedRepStatuses = statusData;
+      })
+      .catch(() => {});
+  }
+  return repsFetchPromise;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -42,41 +76,40 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
 
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [reps, setReps] = useState<Rep[]>([]);
-  const [repStatuses, setRepStatuses] = useState<RepStatusInfo[]>([]);
-  // Mirror searchParams locally so sidebar doesn't need Suspense
+  // Initialize from cache immediately so nav items show on remount
+  const [user, setUser] = useState<UserInfo | null>(cachedUser);
+  const [reps, setReps] = useState<Rep[]>(cachedReps);
+  const [repStatuses, setRepStatuses] = useState<RepStatusInfo[]>(cachedRepStatuses);
   const [viewAs, setViewAs] = useState("");
   const [repActive, setRepActive] = useState("");
 
   const isAdmin = user?.role === "admin";
   const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
 
+  // Fetch user data (uses module-level cache/dedup)
   useEffect(() => {
-    fetch("/api/me")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.id) setUser(data);
-      });
+    fetchUserData().then(() => {
+      if (cachedUser) setUser(cachedUser);
+    });
   }, []);
 
+  // Fetch reps data when user is manager/admin
   useEffect(() => {
     if (isManagerOrAdmin) {
-      Promise.all([
-        fetch("/api/reps").then((r) => r.json()),
-        fetch("/api/rep-status").then((r) => r.json()),
-      ]).then(([repsData, statusData]) => {
-        if (Array.isArray(repsData)) setReps(repsData);
-        if (Array.isArray(statusData)) setRepStatuses(statusData);
+      fetchRepsData().then(() => {
+        setReps(cachedReps);
+        setRepStatuses(cachedRepStatuses);
       });
     }
   }, [isManagerOrAdmin]);
 
-  // Sync viewAs/repActive from URL on mount and when pathname changes
+  // Sync viewAs/repActive from URL
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setViewAs(params.get("viewAs") ?? "");
-    setRepActive(params.get("repActive") ?? "");
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setViewAs(params.get("viewAs") ?? "");
+      setRepActive(params.get("repActive") ?? "");
+    }
   }, [pathname]);
 
   const repActiveMap = useMemo(() => {
@@ -157,7 +190,7 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar — completely outside Suspense */}
+      {/* Sidebar */}
       <aside className="hidden md:flex w-64 flex-col bg-[#0f172a] shrink-0">
         {/* Logo */}
         <div className="p-5 border-b border-slate-800">
@@ -290,7 +323,7 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Mobile header — also outside Suspense */}
+      {/* Mobile header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-10 bg-[#0f172a] border-b border-slate-800">
         <div className="flex items-center justify-between p-3">
           <Link href={`/dashboard${filterQs}`} className="font-bold text-sm text-white">
@@ -361,7 +394,7 @@ export default function DashboardLayout({
         )}
       </div>
 
-      {/* Main content — Suspense only wraps the content area */}
+      {/* Main content */}
       <main className="flex-1 bg-slate-50 p-6 md:p-8 mt-14 md:mt-0 overflow-auto">
         {viewAs && (
           <div className="mb-4 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
