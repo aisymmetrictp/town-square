@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { Suspense, useEffect, useState } from "react";
+import { LayoutDashboard, FileText, Upload, Users, ChevronDown } from "lucide-react";
 
 interface UserInfo {
   id: number;
@@ -46,11 +47,11 @@ function DashboardLayoutInner({
   const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
 
   const navItems = [
-    { href: "/dashboard", label: "Overview", icon: "📊" },
-    { href: "/dashboard/invoices", label: "Invoices", icon: "📄" },
-    { href: "/dashboard/upload", label: "Upload", icon: "📤" },
+    { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
+    { href: "/dashboard/upload", label: "Upload", icon: Upload },
     ...(isAdmin
-      ? [{ href: "/dashboard/admin", label: "Users", icon: "👥" }]
+      ? [{ href: "/dashboard/admin", label: "Users", icon: Users }]
       : []),
   ];
 
@@ -85,41 +86,45 @@ function DashboardLayoutInner({
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col border-r bg-gray-50 shrink-0">
+      <aside className="hidden md:flex w-64 flex-col bg-[#0f172a] shrink-0">
         {/* Logo */}
-        <div className="p-5 border-b">
+        <div className="p-5 border-b border-slate-800">
           <Link href="/dashboard">
             <Image
               src="/tsp-logo.png"
               alt="Town Square Publications"
               width={200}
               height={30}
-              className="mb-1"
+              className="mb-1 brightness-0 invert"
             />
           </Link>
-          <p className="text-[10px] text-gray-400 tracking-wide">
+          <p className="text-[10px] text-slate-500 tracking-wide">
             Powered by AISymmetric
           </p>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 flex flex-col gap-0.5">
+        <nav className="flex-1 px-3 pt-5 flex flex-col gap-0.5">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-4 mb-2">
+            Navigation
+          </p>
           {navItems.map((item) => {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
                 : pathname.startsWith(item.href);
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                   isActive
-                    ? "bg-gray-200 font-medium"
-                    : "hover:bg-gray-100 text-gray-600"
+                    ? "bg-slate-800 text-white font-medium border-l-2 border-blue-500"
+                    : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
                 }`}
               >
-                <span>{item.icon}</span>
+                <Icon className="w-4 h-4" />
                 {item.label}
               </Link>
             );
@@ -129,33 +134,36 @@ function DashboardLayoutInner({
         {/* View as Rep switcher */}
         {isManagerOrAdmin && reps.length > 0 && (
           <div className="px-3 pb-3">
-            <label className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1 px-1">
-              View as Rep
-            </label>
-            <select
-              value={viewAs}
-              onChange={(e) => handleViewAs(e.target.value)}
-              className="w-full border rounded px-2 py-1.5 text-xs bg-white"
-            >
-              <option value="">All Reps (Manager View)</option>
-              {reps.map((r) => (
-                <option key={r.repName} value={r.repName}>
-                  {r.repName}
-                </option>
-              ))}
-            </select>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-4 mb-2">
+              Rep View
+            </p>
+            <div className="relative">
+              <select
+                value={viewAs}
+                onChange={(e) => handleViewAs(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-2 py-1.5 text-xs appearance-none pr-7"
+              >
+                <option value="">All Reps (Manager View)</option>
+                {reps.map((r) => (
+                  <option key={r.repName} value={r.repName}>
+                    {r.repName}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            </div>
           </div>
         )}
 
         {/* User section */}
-        <div className="border-t p-3">
+        <div className="border-t border-slate-800 p-3">
           <div className="flex items-center gap-3">
             <UserButton />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
+              <p className="text-sm font-medium truncate text-white">
                 {user?.repName ?? "Loading..."}
               </p>
-              <p className="text-[10px] text-gray-400 uppercase">
+              <p className="text-[10px] text-slate-500 uppercase">
                 {user?.role ?? ""}
               </p>
             </div>
@@ -164,9 +172,9 @@ function DashboardLayoutInner({
       </aside>
 
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-10 bg-white border-b">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-10 bg-[#0f172a] border-b border-slate-800">
         <div className="flex items-center justify-between p-3">
-          <Link href="/dashboard" className="font-bold text-sm">
+          <Link href="/dashboard" className="font-bold text-sm text-white">
             TSP
           </Link>
           <div className="flex items-center gap-2">
@@ -174,7 +182,7 @@ function DashboardLayoutInner({
               <Link
                 key={item.href}
                 href={item.href}
-                className="text-xs text-gray-600 hover:text-black"
+                className="text-xs text-slate-300 hover:text-white"
               >
                 {item.label}
               </Link>
@@ -187,7 +195,7 @@ function DashboardLayoutInner({
             <select
               value={viewAs}
               onChange={(e) => handleViewAs(e.target.value)}
-              className="w-full border rounded px-2 py-1 text-xs"
+              className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs"
             >
               <option value="">All Reps</option>
               {reps.map((r) => (
@@ -201,7 +209,7 @@ function DashboardLayoutInner({
       </div>
 
       {/* Main content */}
-      <main className="flex-1 p-6 md:p-8 mt-14 md:mt-0 overflow-auto">
+      <main className="flex-1 bg-slate-50 p-6 md:p-8 mt-14 md:mt-0 overflow-auto">
         {/* View-as banner */}
         {viewAs && (
           <div className="mb-4 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
