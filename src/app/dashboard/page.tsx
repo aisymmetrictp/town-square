@@ -148,15 +148,18 @@ function DashboardPage() {
   if (needsSetup) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <p className="text-slate-600">
-          Your account is not linked to a rep yet.
-        </p>
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Welcome to Town Square AR</h2>
+          <p className="text-slate-500 text-sm">
+            Your account needs to be activated to access the dashboard.
+          </p>
+        </div>
         <button
           onClick={handleSetup}
           disabled={settingUp}
           className="bg-slate-900 text-white rounded-lg px-6 py-2.5 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
         >
-          {settingUp ? "Setting up..." : "Set up as Manager"}
+          {settingUp ? "Activating..." : "Activate My Account"}
         </button>
       </div>
     );

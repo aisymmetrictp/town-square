@@ -1,28 +1,14 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { repUsers } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
-// Auto-registers the first signed-in user as a manager.
-// Once a manager exists, this endpoint is disabled.
+// Auto-registers any signed-in Clerk user as a manager.
 export async function POST() {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  }
-
-  // Check if any managers exist
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(repUsers)
-    .where(eq(repUsers.role, "manager"));
-
-  if (total > 0) {
-    return NextResponse.json(
-      { error: "Setup already complete. A manager already exists." },
-      { status: 403 }
-    );
   }
 
   // Check if this user is already registered
@@ -35,13 +21,20 @@ export async function POST() {
     return NextResponse.json({ message: "Already registered", user: existing[0] });
   }
 
-  // Register as manager with access to all reps
+  // Get the user's name from Clerk
+  const clerkUser = await currentUser();
+  const firstName = clerkUser?.firstName ?? "";
+  const lastName = clerkUser?.lastName ?? "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || "Manager";
+  const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? "";
+
+  // Register as manager
   const [newUser] = await db
     .insert(repUsers)
     .values({
       clerkId: userId,
-      repName: "Tyler Perleberg",
-      repCode: "ADMIN",
+      repName: fullName,
+      repCode: email || "MANAGER",
       role: "manager",
     })
     .returning();
