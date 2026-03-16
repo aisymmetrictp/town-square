@@ -83,11 +83,23 @@ export default function SignInPage() {
 
         <div className="relative z-10 flex items-center gap-3 text-xs text-blue-200/40">
           <span>Powered by</span>
-          <span className="font-semibold text-blue-200/60">
+          <a
+            href="https://aisymmetricsolutions.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-blue-200/60 hover:text-white transition-colors"
+          >
             AISymmetric Solutions
-          </span>
+          </a>
           <span className="mx-1">|</span>
-          <span>aisymmetricsolutions.com</span>
+          <a
+            href="https://aisymmetricsolutions.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-white transition-colors"
+          >
+            aisymmetricsolutions.com
+          </a>
         </div>
       </div>
 
@@ -112,7 +124,15 @@ export default function SignInPage() {
         <p className="mt-8 text-xs text-gray-400 text-center max-w-xs">
           Town Square Publications AR Dashboard
           <br />
-          Built by AISymmetric Solutions
+          Built by{" "}
+          <a
+            href="https://aisymmetricsolutions.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-500 hover:text-gray-700 underline"
+          >
+            AISymmetric Solutions
+          </a>
         </p>
       </div>
     </div>
