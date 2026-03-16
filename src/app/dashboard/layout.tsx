@@ -209,7 +209,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 pt-5 flex flex-col gap-0.5">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-3 pt-5 flex flex-col gap-0.5">
           <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-4 mb-2">
             Navigation
           </p>
@@ -238,7 +238,7 @@ export default function DashboardLayout({
 
         {/* View as Rep switcher */}
         {isManagerOrAdmin && reps.length > 0 && (
-          <div className="px-3 pb-3">
+          <div className="px-3 pb-3 shrink-0">
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-4 mb-2">
               Rep View
             </p>
@@ -275,7 +275,7 @@ export default function DashboardLayout({
 
         {/* Rep Status filter */}
         {isManagerOrAdmin && (
-          <div className="px-3 pb-3">
+          <div className="px-3 pb-3 shrink-0">
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-4 mb-2">
               Rep Status
             </p>
@@ -308,7 +308,7 @@ export default function DashboardLayout({
         )}
 
         {/* User section */}
-        <div className="border-t border-slate-800 p-3">
+        <div className="border-t border-slate-800 p-3 shrink-0">
           <div className="flex items-center gap-3">
             <UserButton />
             <div className="flex-1 min-w-0">
