@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { KPICards } from "@/components/KPICards";
 import { AgingChart, type AgingBucket } from "@/components/AgingChart";
 
@@ -13,7 +14,17 @@ interface Summary {
   notPaidCount: number;
 }
 
-export default function DashboardPage() {
+export default function DashboardPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><p className="text-gray-500">Loading dashboard...</p></div>}>
+      <DashboardPage />
+    </Suspense>
+  );
+}
+
+function DashboardPage() {
+  const searchParams = useSearchParams();
+  const viewAs = searchParams.get("viewAs") ?? "";
   const [summary, setSummary] = useState<Summary | null>(null);
   const [aging, setAging] = useState<AgingBucket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,12 +33,13 @@ export default function DashboardPage() {
 
   function loadData() {
     setLoading(true);
+    const qs = viewAs ? `?viewAs=${encodeURIComponent(viewAs)}` : "";
     Promise.all([
-      fetch("/api/invoices/summary").then((r) => {
+      fetch(`/api/invoices/summary${qs}`).then((r) => {
         if (r.status === 401) throw new Error("unauthorized");
         return r.json();
       }),
-      fetch("/api/invoices/aging").then((r) => {
+      fetch(`/api/invoices/aging${qs}`).then((r) => {
         if (r.status === 401) throw new Error("unauthorized");
         return r.json();
       }),
@@ -45,7 +57,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [viewAs]);
 
   async function handleSetup() {
     setSettingUp(true);

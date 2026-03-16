@@ -1,31 +1,27 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
-import { getCurrentRep } from "@/lib/auth";
+import { resolveViewAs } from "@/lib/view-as";
 import { eq } from "drizzle-orm";
 import { BUCKETS, bucketFromDays } from "@/components/AgingChart";
 
-export async function GET() {
-  const rep = await getCurrentRep();
-  if (!rep)
+export async function GET(req: NextRequest) {
+  const result = await resolveViewAs(req);
+  if (!result)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const isManager = rep.role === "manager" || rep.role === "admin";
+  const { filterRepName } = result;
 
-  const rows = isManager
-    ? await db
-        .select({
-          daysOverdue: invoices.daysOverdue,
-          amountDue: invoices.amountDue,
-        })
-        .from(invoices)
-    : await db
-        .select({
-          daysOverdue: invoices.daysOverdue,
-          amountDue: invoices.amountDue,
-        })
-        .from(invoices)
-        .where(eq(invoices.repName, rep.repName));
+  const baseQuery = db
+    .select({
+      daysOverdue: invoices.daysOverdue,
+      amountDue: invoices.amountDue,
+    })
+    .from(invoices);
+
+  const rows = filterRepName
+    ? await baseQuery.where(eq(invoices.repName, filterRepName))
+    : await baseQuery;
 
   const bucketMap: Record<string, number> = {};
   for (const b of BUCKETS) bucketMap[b] = 0;

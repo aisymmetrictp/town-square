@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
-import { getCurrentRep } from "@/lib/auth";
+import { resolveViewAs } from "@/lib/view-as";
 import { eq, and, lte, gt, gte, desc, SQL } from "drizzle-orm";
 
 function bucketToCondition(bucket: string): SQL | undefined {
@@ -26,18 +26,18 @@ function bucketToCondition(bucket: string): SQL | undefined {
 }
 
 export async function GET(req: NextRequest) {
-  const rep = await getCurrentRep();
-  if (!rep)
+  const result = await resolveViewAs(req);
+  if (!result)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const isManager = rep.role === "manager" || rep.role === "admin";
+  const { filterRepName } = result;
   const { searchParams } = new URL(req.url);
   const bucket = searchParams.get("bucket") ?? "";
   const status = searchParams.get("status") ?? "";
 
   const conditions: SQL[] = [];
-  if (!isManager) {
-    conditions.push(eq(invoices.repName, rep.repName));
+  if (filterRepName) {
+    conditions.push(eq(invoices.repName, filterRepName));
   }
   if (bucket) {
     const bc = bucketToCondition(bucket);

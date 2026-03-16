@@ -1,15 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
-import { getCurrentRep } from "@/lib/auth";
-import { eq, sum, count, avg, sql, and, ne } from "drizzle-orm";
+import { resolveViewAs } from "@/lib/view-as";
+import { eq, sum, count, avg, sql } from "drizzle-orm";
 
-export async function GET() {
-  const rep = await getCurrentRep();
-  if (!rep)
+export async function GET(req: NextRequest) {
+  const viewAs = await resolveViewAs(req);
+  if (!viewAs)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const isManager = rep.role === "manager" || rep.role === "admin";
+  const { filterRepName } = viewAs;
 
   const baseQuery = db
     .select({
@@ -25,9 +25,9 @@ export async function GET() {
     })
     .from(invoices);
 
-  const query = isManager
-    ? baseQuery
-    : baseQuery.where(eq(invoices.repName, rep.repName));
+  const query = filterRepName
+    ? baseQuery.where(eq(invoices.repName, filterRepName))
+    : baseQuery;
 
   const [result] = await query;
 

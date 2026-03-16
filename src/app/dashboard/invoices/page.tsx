@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Table,
   TableHead,
@@ -47,7 +48,17 @@ const fmt = (v: string | null) =>
     ? `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
     : "$0.00";
 
-export default function InvoicesPage() {
+export default function InvoicesPageWrapper() {
+  return (
+    <Suspense fallback={<p className="text-gray-500 py-8 text-center">Loading invoices...</p>}>
+      <InvoicesPage />
+    </Suspense>
+  );
+}
+
+function InvoicesPage() {
+  const searchParams = useSearchParams();
+  const viewAs = searchParams.get("viewAs") ?? "";
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [bucket, setBucket] = useState("");
@@ -59,11 +70,12 @@ export default function InvoicesPage() {
     const params = new URLSearchParams();
     if (bucket) params.set("bucket", bucket);
     if (status) params.set("status", status);
+    if (viewAs) params.set("viewAs", viewAs);
     fetch(`/api/invoices?${params}`)
       .then((r) => r.json())
       .then((data) => setRows(data))
       .finally(() => setLoading(false));
-  }, [bucket, status]);
+  }, [bucket, status, viewAs]);
 
   useEffect(() => {
     fetchData();
