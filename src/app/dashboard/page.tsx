@@ -149,7 +149,7 @@ function DashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Welcome to Town Square AR</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Welcome to Town Square Publishing</h2>
           <p className="text-slate-500 text-sm">
             Your account needs to be activated to access the dashboard.
           </p>
