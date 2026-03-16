@@ -52,7 +52,7 @@ export default function SignUpPage() {
             rel="noopener noreferrer"
             className="font-semibold text-blue-200/60 hover:text-white transition-colors"
           >
-            AISymmetric Solutions
+            AISymmetric
           </a>
           <span className="mx-1">|</span>
           <a
@@ -93,7 +93,7 @@ export default function SignUpPage() {
             rel="noopener noreferrer"
             className="text-gray-500 hover:text-gray-700 underline"
           >
-            AISymmetric Solutions
+            AISymmetric
           </a>
         </p>
       </div>
