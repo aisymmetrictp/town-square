@@ -43,7 +43,7 @@ export function AgingChart({ data }: { data: AgingBucket[] }) {
           tickFormatter={(v: number) => "$" + (v / 1000).toFixed(0) + "K"}
         />
         <Tooltip
-          formatter={(v: number) => ["$" + v.toLocaleString(), "Amount Due"]}
+          formatter={(v) => ["$" + Number(v).toLocaleString(), "Amount Due"]}
         />
         <Bar dataKey="amountDue" fill="#3B82F6" radius={[4, 4, 0, 0]} />
       </BarChart>
