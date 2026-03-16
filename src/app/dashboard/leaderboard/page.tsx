@@ -278,6 +278,46 @@ function LeaderboardContent() {
                 );
               })}
             </tbody>
+            {sorted.length > 0 && (() => {
+              const totGross = sorted.reduce((s, r) => s + r.totalGross, 0);
+              const totPaid = sorted.reduce((s, r) => s + r.totalPaid, 0);
+              const totDue = sorted.reduce((s, r) => s + r.totalDue, 0);
+              const totInvoices = sorted.reduce((s, r) => s + r.invoiceCount, 0);
+              const totUnpaid = sorted.reduce((s, r) => s + r.unpaidCount, 0);
+              const avgDays = sorted.length > 0 ? Math.round(sorted.reduce((s, r) => s + r.avgDaysOverdue, 0) / sorted.length) : 0;
+              const overallRate = totGross > 0 ? (totPaid / totGross) * 100 : 0;
+              return (
+                <tfoot>
+                  <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-900">
+                    <td className="py-3 px-4"></td>
+                    <td className="py-3 px-4 text-xs uppercase tracking-wider text-slate-500">
+                      Totals ({sorted.length} reps)
+                    </td>
+                    <td className="text-right py-3 px-4 tabular-nums">
+                      <span className={`text-sm font-bold ${overallRate >= 80 ? "text-emerald-600" : overallRate >= 50 ? "text-amber-600" : "text-rose-600"}`}>
+                        {overallRate.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="text-right py-3 px-4 tabular-nums">
+                      ${totDue.toLocaleString()}
+                    </td>
+                    <td className="text-right py-3 px-4 tabular-nums hidden md:table-cell">
+                      {totInvoices.toLocaleString()}
+                    </td>
+                    <td className="text-right py-3 px-4 tabular-nums hidden md:table-cell">
+                      <span className={avgDays > 90 ? "text-rose-600" : avgDays > 30 ? "text-amber-600" : "text-slate-600"}>
+                        {avgDays}d
+                      </span>
+                    </td>
+                    <td className="text-right py-3 px-4 tabular-nums hidden lg:table-cell">
+                      {totUnpaid.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4 hidden lg:table-cell"></td>
+                    <td className="py-3 px-4"></td>
+                  </tr>
+                </tfoot>
+              );
+            })()}
           </table>
         </div>
       </div>

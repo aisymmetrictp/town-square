@@ -188,6 +188,34 @@ function InvoicesPage() {
             </button>
           )}
         </div>
+
+        {/* Rollup summary when filters active */}
+        {(bucket || status) && !loading && rows.length > 0 && (() => {
+          const totalGross = rows.reduce((s, r) => s + Number(r.grossPrice ?? 0), 0);
+          const totalPaid = rows.reduce((s, r) => s + Number(r.paidAmount ?? 0), 0);
+          const totalDue = rows.reduce((s, r) => s + Number(r.amountDue ?? 0), 0);
+          const fmtNum = (v: number) => `$${v.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+          return (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-slate-50 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Invoices</p>
+                <p className="text-lg font-bold text-slate-900 tabular-nums">{rows.length.toLocaleString()}</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Gross</p>
+                <p className="text-lg font-bold text-slate-900 tabular-nums">{fmtNum(totalGross)}</p>
+              </div>
+              <div className="bg-emerald-50 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-emerald-500 uppercase tracking-wider font-medium">Paid</p>
+                <p className="text-lg font-bold text-emerald-700 tabular-nums">{fmtNum(totalPaid)}</p>
+              </div>
+              <div className="bg-rose-50 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-rose-400 uppercase tracking-wider font-medium">Amount Due</p>
+                <p className="text-lg font-bold text-rose-700 tabular-nums">{fmtNum(totalDue)}</p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Table */}

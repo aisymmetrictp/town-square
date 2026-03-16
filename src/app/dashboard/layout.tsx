@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -30,6 +30,11 @@ interface Rep {
   repCode: string;
 }
 
+interface RepStatusInfo {
+  repName: string;
+  isActive: boolean;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -52,11 +57,21 @@ function DashboardLayoutInner({
   const searchParams = useSearchParams();
   const [user, setUser] = useState<UserInfo | null>(null);
   const [reps, setReps] = useState<Rep[]>([]);
+  const [repStatuses, setRepStatuses] = useState<RepStatusInfo[]>([]);
   const viewAs = searchParams.get("viewAs") ?? "";
   const repActive = searchParams.get("repActive") ?? "";
 
   const isAdmin = user?.role === "admin";
   const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
+
+  // Build query string that persists across nav
+  const filterQs = useMemo(() => {
+    const params = new URLSearchParams();
+    if (viewAs) params.set("viewAs", viewAs);
+    if (repActive) params.set("repActive", repActive);
+    const str = params.toString();
+    return str ? `?${str}` : "";
+  }, [viewAs, repActive]);
 
   const navItems = [
     { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -85,13 +100,43 @@ function DashboardLayoutInner({
 
   useEffect(() => {
     if (isManagerOrAdmin) {
-      fetch("/api/reps")
-        .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data)) setReps(data);
-        });
+      Promise.all([
+        fetch("/api/reps").then((r) => r.json()),
+        fetch("/api/rep-status").then((r) => r.json()),
+      ]).then(([repsData, statusData]) => {
+        if (Array.isArray(repsData)) setReps(repsData);
+        if (Array.isArray(statusData)) setRepStatuses(statusData);
+      });
     }
   }, [isManagerOrAdmin]);
+
+  // Build a lookup of rep active status
+  const repActiveMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const s of repStatuses) {
+      map.set(s.repName, s.isActive);
+    }
+    return map;
+  }, [repStatuses]);
+
+  // Split reps into active and inactive for the dropdown
+  const { activeReps, inactiveReps } = useMemo(() => {
+    const active: Rep[] = [];
+    const inactive: Rep[] = [];
+    for (const r of reps) {
+      const status = repActiveMap.get(r.repName);
+      if (status === false) {
+        inactive.push(r);
+      } else {
+        active.push(r);
+      }
+    }
+    return { activeReps: active, inactiveReps: inactive };
+  }, [reps, repActiveMap]);
+
+  // Count for the badges
+  const activeCount = activeReps.length;
+  const inactiveCount = inactiveReps.length;
 
   function handleViewAs(repName: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -110,6 +155,10 @@ function DashboardLayoutInner({
     } else {
       params.delete("repActive");
     }
+    // Clear viewAs if switching to inactive (can't view-as an inactive rep meaningfully)
+    if (value === "inactive") {
+      params.delete("viewAs");
+    }
     router.push(`${pathname}?${params.toString()}`);
   }
 
@@ -119,7 +168,7 @@ function DashboardLayoutInner({
       <aside className="hidden md:flex w-64 flex-col bg-[#0f172a] shrink-0">
         {/* Logo */}
         <div className="p-5 border-b border-slate-800">
-          <Link href="/dashboard">
+          <Link href={`/dashboard${filterQs}`}>
             <Image
               src="/tsp-logo.png"
               alt="Town Square Publications"
@@ -147,7 +196,7 @@ function DashboardLayoutInner({
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={`${item.href}${filterQs}`}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
                   isActive
                     ? "bg-slate-800 text-white font-medium border-l-2 border-blue-500"
@@ -174,11 +223,24 @@ function DashboardLayoutInner({
                 className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-2 py-1.5 text-xs appearance-none pr-7"
               >
                 <option value="">All Reps (Manager View)</option>
-                {reps.map((r) => (
-                  <option key={r.repName} value={r.repName}>
-                    {r.repName}
-                  </option>
-                ))}
+                {activeReps.length > 0 && (
+                  <optgroup label={`Active (${activeCount})`}>
+                    {activeReps.map((r) => (
+                      <option key={r.repName} value={r.repName}>
+                        {r.repName}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {inactiveReps.length > 0 && (
+                  <optgroup label={`Inactive (${inactiveCount})`}>
+                    {inactiveReps.map((r) => (
+                      <option key={r.repName} value={r.repName}>
+                        {r.repName}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             </div>
@@ -207,6 +269,12 @@ function DashboardLayoutInner({
                   }`}
                 >
                   {opt.label}
+                  {opt.value === "active" && activeCount > 0 && (
+                    <span className="ml-1 text-[9px] opacity-70">{activeCount}</span>
+                  )}
+                  {opt.value === "inactive" && inactiveCount > 0 && (
+                    <span className="ml-1 text-[9px] opacity-70">{inactiveCount}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -232,14 +300,14 @@ function DashboardLayoutInner({
       {/* Mobile header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-10 bg-[#0f172a] border-b border-slate-800">
         <div className="flex items-center justify-between p-3">
-          <Link href="/dashboard" className="font-bold text-sm text-white">
+          <Link href={`/dashboard${filterQs}`} className="font-bold text-sm text-white">
             TSP
           </Link>
           <div className="flex items-center gap-2">
             {navItems.map((item) => (
               <Link
                 key={item.href}
-                href={item.href}
+                href={`${item.href}${filterQs}`}
                 className="text-xs text-slate-300 hover:text-white"
               >
                 {item.label}
@@ -249,19 +317,53 @@ function DashboardLayoutInner({
           </div>
         </div>
         {isManagerOrAdmin && reps.length > 0 && (
-          <div className="px-3 pb-2">
-            <select
-              value={viewAs}
-              onChange={(e) => handleViewAs(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs"
-            >
-              <option value="">All Reps</option>
-              {reps.map((r) => (
-                <option key={r.repName} value={r.repName}>
-                  {r.repName}
-                </option>
+          <div className="px-3 pb-2 flex gap-2">
+            <div className="relative flex-1">
+              <select
+                value={viewAs}
+                onChange={(e) => handleViewAs(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs"
+              >
+                <option value="">All Reps</option>
+                {activeReps.length > 0 && (
+                  <optgroup label={`Active (${activeCount})`}>
+                    {activeReps.map((r) => (
+                      <option key={r.repName} value={r.repName}>
+                        {r.repName}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {inactiveReps.length > 0 && (
+                  <optgroup label={`Inactive (${inactiveCount})`}>
+                    {inactiveReps.map((r) => (
+                      <option key={r.repName} value={r.repName}>
+                        {r.repName}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+            <div className="flex gap-0.5">
+              {[
+                { value: "", label: "All" },
+                { value: "active", label: "Act" },
+                { value: "inactive", label: "Inact" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleRepActive(opt.value)}
+                  className={`text-[10px] px-2 py-1 rounded font-medium transition-colors ${
+                    repActive === opt.value
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-400 bg-slate-800"
+                  }`}
+                >
+                  {opt.label}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
         )}
       </div>
@@ -273,12 +375,30 @@ function DashboardLayoutInner({
           <div className="mb-4 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
             <span className="text-sm text-blue-700">
               Viewing as: <strong>{viewAs}</strong>
+              {repActiveMap.has(viewAs) && !repActiveMap.get(viewAs) && (
+                <span className="ml-2 text-xs text-amber-600 font-medium">(Inactive)</span>
+              )}
             </span>
             <button
               onClick={() => handleViewAs("")}
               className="text-xs text-blue-600 hover:underline ml-auto"
             >
               Exit rep view
+            </button>
+          </div>
+        )}
+        {repActive && !viewAs && (
+          <div className="mb-4 flex items-center gap-3 bg-slate-100 border border-slate-200 rounded-lg px-4 py-2">
+            <span className="text-sm text-slate-600">
+              Showing: <strong className="capitalize">{repActive}</strong> reps
+              {repActive === "active" && <span className="text-xs text-slate-400 ml-1">({activeCount})</span>}
+              {repActive === "inactive" && <span className="text-xs text-slate-400 ml-1">({inactiveCount})</span>}
+            </span>
+            <button
+              onClick={() => handleRepActive("")}
+              className="text-xs text-slate-500 hover:underline ml-auto"
+            >
+              Show all
             </button>
           </div>
         )}
