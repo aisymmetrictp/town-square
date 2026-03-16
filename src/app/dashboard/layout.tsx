@@ -14,7 +14,6 @@ import {
   Trophy,
   AlertTriangle,
   BarChart3,
-  TrendingUp,
   UserX,
 } from "lucide-react";
 
@@ -40,55 +39,13 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen"><p className="text-gray-500">Loading...</p></div>}>
-      <DashboardLayoutInner>{children}</DashboardLayoutInner>
-    </Suspense>
-  );
-}
-
-function DashboardLayoutInner({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  // Keep user/reps state OUTSIDE Suspense so it persists across navigations
   const [user, setUser] = useState<UserInfo | null>(null);
   const [reps, setReps] = useState<Rep[]>([]);
   const [repStatuses, setRepStatuses] = useState<RepStatusInfo[]>([]);
-  const viewAs = searchParams.get("viewAs") ?? "";
-  const repActive = searchParams.get("repActive") ?? "";
 
   const isAdmin = user?.role === "admin";
   const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
-
-  // Build query string that persists across nav
-  const filterQs = useMemo(() => {
-    const params = new URLSearchParams();
-    if (viewAs) params.set("viewAs", viewAs);
-    if (repActive) params.set("repActive", repActive);
-    const str = params.toString();
-    return str ? `?${str}` : "";
-  }, [viewAs, repActive]);
-
-  const navItems = [
-    { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
-    { href: "/dashboard/upload", label: "Upload", icon: Upload },
-    ...(isManagerOrAdmin
-      ? [
-          { href: "/dashboard/leaderboard", label: "Leaderboard", icon: Trophy },
-          { href: "/dashboard/write-off-risk", label: "Write-Off Risk", icon: AlertTriangle },
-          { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-          { href: "/dashboard/unassigned", label: "Unassigned", icon: UserX },
-        ]
-      : []),
-    ...(isAdmin
-      ? [{ href: "/dashboard/admin", label: "Users", icon: Users }]
-      : []),
-  ];
 
   useEffect(() => {
     fetch("/api/me")
@@ -134,9 +91,82 @@ function DashboardLayoutInner({
     return { activeReps: active, inactiveReps: inactive };
   }, [reps, repActiveMap]);
 
-  // Count for the badges
   const activeCount = activeReps.length;
   const inactiveCount = inactiveReps.length;
+
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen"><p className="text-gray-500">Loading...</p></div>}>
+      <DashboardLayoutInner
+        user={user}
+        isAdmin={isAdmin}
+        isManagerOrAdmin={isManagerOrAdmin}
+        reps={reps}
+        activeReps={activeReps}
+        inactiveReps={inactiveReps}
+        activeCount={activeCount}
+        inactiveCount={inactiveCount}
+        repActiveMap={repActiveMap}
+      >
+        {children}
+      </DashboardLayoutInner>
+    </Suspense>
+  );
+}
+
+function DashboardLayoutInner({
+  children,
+  user,
+  isAdmin,
+  isManagerOrAdmin,
+  reps,
+  activeReps,
+  inactiveReps,
+  activeCount,
+  inactiveCount,
+  repActiveMap,
+}: {
+  children: React.ReactNode;
+  user: UserInfo | null;
+  isAdmin: boolean;
+  isManagerOrAdmin: boolean;
+  reps: Rep[];
+  activeReps: Rep[];
+  inactiveReps: Rep[];
+  activeCount: number;
+  inactiveCount: number;
+  repActiveMap: Map<string, boolean>;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const viewAs = searchParams.get("viewAs") ?? "";
+  const repActive = searchParams.get("repActive") ?? "";
+
+  // Build query string that persists across nav
+  const filterQs = useMemo(() => {
+    const params = new URLSearchParams();
+    if (viewAs) params.set("viewAs", viewAs);
+    if (repActive) params.set("repActive", repActive);
+    const str = params.toString();
+    return str ? `?${str}` : "";
+  }, [viewAs, repActive]);
+
+  const navItems = [
+    { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
+    { href: "/dashboard/upload", label: "Upload", icon: Upload },
+    ...(isManagerOrAdmin
+      ? [
+          { href: "/dashboard/leaderboard", label: "Leaderboard", icon: Trophy },
+          { href: "/dashboard/write-off-risk", label: "Write-Off Risk", icon: AlertTriangle },
+          { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+          { href: "/dashboard/unassigned", label: "Unassigned", icon: UserX },
+        ]
+      : []),
+    ...(isAdmin
+      ? [{ href: "/dashboard/admin", label: "Users", icon: Users }]
+      : []),
+  ];
 
   function handleViewAs(repName: string) {
     const params = new URLSearchParams(searchParams.toString());
