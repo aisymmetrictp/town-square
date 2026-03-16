@@ -54,12 +54,7 @@ export default function DashboardLayout({
 
         {/* User */}
         <div className="border-t p-4 flex items-center gap-3">
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: { avatarBox: "w-8 h-8" },
-            }}
-          />
+          <UserButton />
           <span className="text-sm text-gray-600">Account</span>
         </div>
       </aside>
@@ -80,7 +75,7 @@ export default function DashboardLayout({
                 {item.label}
               </Link>
             ))}
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </div>
         </div>
       </div>
