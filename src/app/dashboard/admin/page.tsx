@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Mail, Check } from "lucide-react";
 
 interface User {
   id: number;
@@ -10,36 +11,25 @@ interface User {
   role: string;
 }
 
-interface Rep {
-  repName: string;
-  repCode: string;
-}
-
 const ROLES = ["rep", "manager", "admin"];
 
 export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [reps, setReps] = useState<Rep[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // New user form
-  const [newClerkId, setNewClerkId] = useState("");
-  const [newRepName, setNewRepName] = useState("");
-  const [newRepCode, setNewRepCode] = useState("");
-  const [newRole, setNewRole] = useState("rep");
-  const [adding, setAdding] = useState(false);
+  // Invite form
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState("");
 
   const fetchData = useCallback(() => {
     setLoading(true);
-    Promise.all([
-      fetch("/api/users").then((r) => r.json()),
-      fetch("/api/reps").then((r) => r.json()),
-    ])
-      .then(([usersData, repsData]) => {
-        if (Array.isArray(usersData)) setUsers(usersData);
-        else setError(usersData.error || "Failed to load users");
-        if (Array.isArray(repsData)) setReps(repsData);
+    fetch("/api/users")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setUsers(data);
+        else setError(data.error || "Failed to load users");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -63,41 +53,30 @@ export default function AdminPage() {
     fetchData();
   }
 
-  async function handleAdd() {
-    if (!newClerkId || !newRepName || !newRepCode) {
-      setError("All fields are required");
+  async function handleInvite() {
+    if (!inviteEmail) {
+      setError("Email is required");
       return;
     }
-    setAdding(true);
+    setInviting(true);
     setError("");
-    const res = await fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        clerkId: newClerkId,
-        repName: newRepName,
-        repCode: newRepCode,
-        role: newRole,
-      }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setNewClerkId("");
-      setNewRepName("");
-      setNewRepCode("");
-      setNewRole("rep");
-      fetchData();
-    } else {
-      setError(data.error || "Failed to add user");
-    }
-    setAdding(false);
-  }
-
-  function handleRepSelect(repName: string) {
-    const rep = reps.find((r) => r.repName === repName);
-    if (rep) {
-      setNewRepName(rep.repName);
-      setNewRepCode(rep.repCode);
+    setInviteSuccess("");
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setInviteSuccess(`Invitation sent to ${inviteEmail}`);
+        setInviteEmail("");
+        setTimeout(() => setInviteSuccess(""), 5000);
+      } else {
+        setError(data.error || "Failed to send invitation");
+      }
+    } finally {
+      setInviting(false);
     }
   }
 
@@ -173,92 +152,40 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Add user */}
+      {/* Invite user */}
       <div className="border rounded-lg p-6 max-w-lg">
-        <h2 className="text-lg font-semibold mb-4">Add User</h2>
+        <h2 className="text-lg font-semibold mb-2">Invite User</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Send an email invitation. They&apos;ll be added as a manager when they sign up.
+        </p>
+
+        {inviteSuccess && (
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2">
+            <Check size={16} className="text-emerald-600" />
+            <p className="text-sm text-emerald-800">{inviteSuccess}</p>
+          </div>
+        )}
 
         {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">
-              Clerk User ID
-            </label>
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
-              value={newClerkId}
-              onChange={(e) => setNewClerkId(e.target.value)}
-              placeholder="user_..."
-              className="border rounded px-3 py-1.5 text-sm w-full"
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleInvite()}
+              placeholder="colleague@company.com"
+              className="border rounded-lg pl-9 pr-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
-            <p className="text-xs text-gray-400 mt-1">
-              Find this in the Clerk Dashboard under Users
-            </p>
           </div>
-
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">
-              Link to Rep (from invoices)
-            </label>
-            <select
-              onChange={(e) => handleRepSelect(e.target.value)}
-              className="border rounded px-3 py-1.5 text-sm w-full"
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Select a rep...
-              </option>
-              {reps.map((r) => (
-                <option key={r.repName} value={r.repName}>
-                  {r.repName} ({r.repCode})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">
-                Rep Name
-              </label>
-              <input
-                value={newRepName}
-                onChange={(e) => setNewRepName(e.target.value)}
-                className="border rounded px-3 py-1.5 text-sm w-full"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">
-                Rep Code
-              </label>
-              <input
-                value={newRepCode}
-                onChange={(e) => setNewRepCode(e.target.value)}
-                className="border rounded px-3 py-1.5 text-sm w-full"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Role</label>
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              className="border rounded px-3 py-1.5 text-sm w-full"
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <button
-            onClick={handleAdd}
-            disabled={adding}
-            className="bg-black text-white rounded px-5 py-2 text-sm hover:bg-gray-800 disabled:opacity-50 w-full"
+            onClick={handleInvite}
+            disabled={inviting || !inviteEmail}
+            className="bg-slate-900 text-white rounded-lg px-5 py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors whitespace-nowrap"
           >
-            {adding ? "Adding..." : "Add User"}
+            {inviting ? "Sending..." : "Send Invite"}
           </button>
         </div>
       </div>

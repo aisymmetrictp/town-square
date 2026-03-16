@@ -191,7 +191,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col bg-[#0f172a] shrink-0">
+      <aside className="hidden md:flex w-64 flex-col bg-[#0f172a] shrink-0 h-screen sticky top-0">
         {/* Logo */}
         <div className="p-5 border-b border-slate-800">
           <Link href={`/dashboard${filterQs}`}>
