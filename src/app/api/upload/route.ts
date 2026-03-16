@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { invoices } from "@/db/schema";
+import { invoices, uploadAudits } from "@/db/schema";
 import { getCurrentRep } from "@/lib/auth";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -13,6 +13,60 @@ const REQUIRED_COLUMNS = [
 ];
 
 const BATCH_SIZE = 500;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface ValidationWarning {
+  row: number;
+  field: string;
+  message: string;
+}
+
+function validateRow(
+  r: Record<string, unknown>,
+  rowNum: number
+): ValidationWarning[] {
+  const warnings: ValidationWarning[] = [];
+
+  const gross = Number(r["Gross price"] ?? 0);
+  const amountDue = Number(r["Amount due"] ?? 0);
+  const days = Number(r["cDays_Overdue"] ?? 0);
+  const email = r["Email"] ? String(r["Email"]).trim() : "";
+
+  if (amountDue > gross && gross > 0) {
+    warnings.push({
+      row: rowNum,
+      field: "Amount due",
+      message: `Amount due ($${amountDue}) exceeds gross price ($${gross})`,
+    });
+  }
+
+  if (days < 0) {
+    warnings.push({
+      row: rowNum,
+      field: "cDays_Overdue",
+      message: `Negative days overdue (${days})`,
+    });
+  }
+
+  if (email && !EMAIL_RE.test(email)) {
+    warnings.push({
+      row: rowNum,
+      field: "Email",
+      message: `Malformed email: ${email}`,
+    });
+  }
+
+  if (amountDue < 0) {
+    warnings.push({
+      row: rowNum,
+      field: "Amount due",
+      message: `Negative amount due ($${amountDue})`,
+    });
+  }
+
+  return warnings;
+}
 
 export async function POST(req: NextRequest) {
   const rep = await getCurrentRep();
@@ -45,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   if (rows.length === 0) {
     return NextResponse.json(
-      { error: "File contains no data", rowsInserted: 0, errors: [] },
+      { error: "File contains no data", rowsInserted: 0, errors: [], validationWarnings: [] },
       { status: 400 }
     );
   }
@@ -62,9 +116,17 @@ export async function POST(req: NextRequest) {
         error: `Missing required columns: ${missingColumns.join(", ")}`,
         rowsInserted: 0,
         errors: missingColumns.map((col) => `Missing column: ${col}`),
+        validationWarnings: [],
       },
       { status: 400 }
     );
+  }
+
+  // Run validation on all rows first
+  const allWarnings: ValidationWarning[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const rowWarnings = validateRow(rows[i], i + 2); // +2 for 1-indexed + header
+    allWarnings.push(...rowWarnings);
   }
 
   const today = new Date();
@@ -72,6 +134,7 @@ export async function POST(req: NextRequest) {
 
   let rowsInserted = 0;
   const errors: string[] = [];
+  let rowsSkipped = 0;
 
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const chunk = rows.slice(i, i + BATCH_SIZE);
@@ -79,18 +142,18 @@ export async function POST(req: NextRequest) {
 
     for (let j = 0; j < chunk.length; j++) {
       const r = chunk[j];
-      const rowNum = i + j + 2; // +2 for 1-indexed + header row
+      const rowNum = i + j + 2;
 
       const repName = r["ContractSoldBy"];
       const invoiceNo = r["Invoice #"];
       const amountDue = r["Amount due"];
       const daysOverdue = r["cDays_Overdue"];
 
-      // Validate required fields have values
       if (!repName || !invoiceNo) {
         errors.push(
           `Row ${rowNum}: missing ContractSoldBy or Invoice #, skipped`
         );
+        rowsSkipped++;
         continue;
       }
 
@@ -133,9 +196,32 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Write audit log
+  const warningStrings = allWarnings.map(
+    (w) => `Row ${w.row}: [${w.field}] ${w.message}`
+  );
+
+  try {
+    await db.insert(uploadAudits).values({
+      clerkId: rep.clerkId,
+      uploadedBy: rep.repName,
+      fileName: file.name,
+      rowsTotal: rows.length,
+      rowsInserted,
+      rowsSkipped,
+      snapshotDate,
+      validationWarnings: warningStrings,
+      errors,
+    });
+  } catch {
+    // Don't fail the upload if audit logging fails
+  }
+
   return NextResponse.json({
     rowsInserted,
+    rowsSkipped,
     snapshotDate,
     errors,
+    validationWarnings: warningStrings,
   });
 }

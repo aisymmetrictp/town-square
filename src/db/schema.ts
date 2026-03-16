@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, integer, date, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, numeric, integer, date, timestamp, json } from 'drizzle-orm/pg-core';
 
 export const invoices = pgTable('invoices', {
   id:             serial('id').primaryKey(),
@@ -20,6 +20,29 @@ export const invoices = pgTable('invoices', {
   email:          text('email'),
   snapshotDate:   date('snapshot_date').notNull(),
   createdAt:      timestamp('created_at').defaultNow(),
+});
+
+export const uploadAudits = pgTable('upload_audits', {
+  id:               serial('id').primaryKey(),
+  clerkId:          text('clerk_id').notNull(),
+  uploadedBy:       text('uploaded_by').notNull(),
+  fileName:         text('file_name').notNull(),
+  rowsTotal:        integer('rows_total').notNull(),
+  rowsInserted:     integer('rows_inserted').notNull(),
+  rowsSkipped:      integer('rows_skipped').notNull(),
+  snapshotDate:     text('snapshot_date').notNull(),
+  validationWarnings: json('validation_warnings').$type<string[]>().default([]),
+  errors:           json('errors').$type<string[]>().default([]),
+  createdAt:        timestamp('created_at').defaultNow(),
+});
+
+export const contactsLog = pgTable('contacts_log', {
+  id:          serial('id').primaryKey(),
+  invoiceId:   integer('invoice_id').notNull(),
+  repClerkId:  text('rep_clerk_id').notNull(),
+  repName:     text('rep_name').notNull(),
+  note:        text('note'),
+  contactedAt: timestamp('contacted_at').defaultNow(),
 });
 
 export const repUsers = pgTable('rep_users', {

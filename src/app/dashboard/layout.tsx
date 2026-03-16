@@ -5,7 +5,17 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { Suspense, useEffect, useState } from "react";
-import { LayoutDashboard, FileText, Upload, Users, ChevronDown } from "lucide-react";
+import {
+  LayoutDashboard,
+  FileText,
+  Upload,
+  Users,
+  ChevronDown,
+  Trophy,
+  AlertTriangle,
+  BarChart3,
+  TrendingUp,
+} from "lucide-react";
 
 interface UserInfo {
   id: number;
@@ -50,6 +60,13 @@ function DashboardLayoutInner({
     { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
     { href: "/dashboard/upload", label: "Upload", icon: Upload },
+    ...(isManagerOrAdmin
+      ? [
+          { href: "/dashboard/leaderboard", label: "Leaderboard", icon: Trophy },
+          { href: "/dashboard/write-off-risk", label: "Write-Off Risk", icon: AlertTriangle },
+          { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+        ]
+      : []),
     ...(isAdmin
       ? [{ href: "/dashboard/admin", label: "Users", icon: Users }]
       : []),

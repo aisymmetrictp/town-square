@@ -4,7 +4,16 @@ import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { bucketFromDays, BUCKETS } from "@/lib/aging-buckets";
-import { X, Phone, Mail, User, ExternalLink } from "lucide-react";
+import {
+  X,
+  Phone,
+  Mail,
+  User,
+  ExternalLink,
+  MessageSquare,
+  Send,
+  CheckCircle2,
+} from "lucide-react";
 
 interface Invoice {
   id: number;
@@ -71,6 +80,9 @@ function InvoicesPage() {
   const [bucket, setBucket] = useState(urlBucket);
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<Invoice | null>(null);
+  const [contactNote, setContactNote] = useState("");
+  const [loggingContact, setLoggingContact] = useState(false);
+  const [contactLogged, setContactLogged] = useState(false);
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -87,6 +99,35 @@ function InvoicesPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  function buildMailtoLink(inv: Invoice) {
+    const subject = encodeURIComponent(
+      `Invoice #${inv.invoiceNo} — Payment Follow-up`
+    );
+    const body = encodeURIComponent(
+      `Dear ${inv.contact || "Customer"},\n\n` +
+        `I'm writing to follow up on Invoice #${inv.invoiceNo} with an outstanding balance of ${fmt(inv.amountDue)}.\n\n` +
+        `This invoice is currently ${inv.daysOverdue} days overdue. We would appreciate your prompt attention to this matter.\n\n` +
+        `Please let me know if you have any questions.\n\nBest regards`
+    );
+    return `mailto:${inv.email}?subject=${subject}&body=${body}`;
+  }
+
+  async function logContact() {
+    if (!selected) return;
+    setLoggingContact(true);
+    try {
+      await fetch("/api/contacts-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceId: selected.id, note: contactNote }),
+      });
+      setContactLogged(true);
+      setContactNote("");
+    } finally {
+      setLoggingContact(false);
+    }
+  }
 
   return (
     <div>
@@ -191,7 +232,11 @@ function InvoicesPage() {
                       className={`border-b border-slate-50 cursor-pointer hover:bg-blue-50/40 transition-colors ${
                         i % 2 === 1 ? "bg-slate-50/50" : ""
                       }`}
-                      onClick={() => setSelected(inv)}
+                      onClick={() => {
+                        setSelected(inv);
+                        setContactLogged(false);
+                        setContactNote("");
+                      }}
                     >
                       <td className="py-3 px-4 font-medium text-slate-900 max-w-[200px] truncate">
                         {inv.customer}
@@ -355,6 +400,51 @@ function InvoicesPage() {
                       <span className="text-sm text-slate-400">\u2014</span>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div>
+                <h3 className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-3">
+                  Quick Actions
+                </h3>
+                <div className="space-y-2">
+                  {selected.email && (
+                    <a
+                      href={buildMailtoLink(selected)}
+                      className="flex items-center gap-2 w-full py-2.5 px-3 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors"
+                    >
+                      <Send size={14} />
+                      Send Follow-up Email
+                    </a>
+                  )}
+                  {!contactLogged ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Contact note..."
+                        value={contactNote}
+                        onChange={(e) => setContactNote(e.target.value)}
+                        className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") logContact();
+                        }}
+                      />
+                      <button
+                        onClick={logContact}
+                        disabled={loggingContact}
+                        className="shrink-0 flex items-center gap-1.5 bg-slate-900 text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                      >
+                        <MessageSquare size={14} />
+                        {loggingContact ? "..." : "Log"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-emerald-600 text-sm py-2">
+                      <CheckCircle2 size={16} />
+                      Contact logged
+                    </div>
+                  )}
                 </div>
               </div>
 
