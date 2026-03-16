@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { resolveViewAs } from "@/lib/view-as";
 import { eq } from "drizzle-orm";
-import { BUCKETS, bucketFromDays } from "@/components/AgingChart";
+import { BUCKETS, bucketFromDays } from "@/lib/aging-buckets";
 
 export async function GET(req: NextRequest) {
   const result = await resolveViewAs(req);

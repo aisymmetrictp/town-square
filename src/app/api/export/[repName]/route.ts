@@ -4,7 +4,7 @@ import { invoices } from "@/db/schema";
 import { getCurrentRep } from "@/lib/auth";
 import { eq, desc } from "drizzle-orm";
 import * as XLSX from "xlsx";
-import { bucketFromDays } from "@/components/AgingChart";
+import { bucketFromDays } from "@/lib/aging-buckets";
 
 export async function GET(
   _req: NextRequest,
