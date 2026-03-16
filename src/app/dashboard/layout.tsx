@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -39,10 +39,15 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Keep user/reps state OUTSIDE Suspense so it persists across navigations
+  const pathname = usePathname();
+  const router = useRouter();
+
   const [user, setUser] = useState<UserInfo | null>(null);
   const [reps, setReps] = useState<Rep[]>([]);
   const [repStatuses, setRepStatuses] = useState<RepStatusInfo[]>([]);
+  // Mirror searchParams locally so sidebar doesn't need Suspense
+  const [viewAs, setViewAs] = useState("");
+  const [repActive, setRepActive] = useState("");
 
   const isAdmin = user?.role === "admin";
   const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
@@ -67,7 +72,13 @@ export default function DashboardLayout({
     }
   }, [isManagerOrAdmin]);
 
-  // Build a lookup of rep active status
+  // Sync viewAs/repActive from URL on mount and when pathname changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setViewAs(params.get("viewAs") ?? "");
+    setRepActive(params.get("repActive") ?? "");
+  }, [pathname]);
+
   const repActiveMap = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const s of repStatuses) {
@@ -76,7 +87,6 @@ export default function DashboardLayout({
     return map;
   }, [repStatuses]);
 
-  // Split reps into active and inactive for the dropdown
   const { activeReps, inactiveReps } = useMemo(() => {
     const active: Rep[] = [];
     const inactive: Rep[] = [];
@@ -94,55 +104,6 @@ export default function DashboardLayout({
   const activeCount = activeReps.length;
   const inactiveCount = inactiveReps.length;
 
-  return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen"><p className="text-gray-500">Loading...</p></div>}>
-      <DashboardLayoutInner
-        user={user}
-        isAdmin={isAdmin}
-        isManagerOrAdmin={isManagerOrAdmin}
-        reps={reps}
-        activeReps={activeReps}
-        inactiveReps={inactiveReps}
-        activeCount={activeCount}
-        inactiveCount={inactiveCount}
-        repActiveMap={repActiveMap}
-      >
-        {children}
-      </DashboardLayoutInner>
-    </Suspense>
-  );
-}
-
-function DashboardLayoutInner({
-  children,
-  user,
-  isAdmin,
-  isManagerOrAdmin,
-  reps,
-  activeReps,
-  inactiveReps,
-  activeCount,
-  inactiveCount,
-  repActiveMap,
-}: {
-  children: React.ReactNode;
-  user: UserInfo | null;
-  isAdmin: boolean;
-  isManagerOrAdmin: boolean;
-  reps: Rep[];
-  activeReps: Rep[];
-  inactiveReps: Rep[];
-  activeCount: number;
-  inactiveCount: number;
-  repActiveMap: Map<string, boolean>;
-}) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const viewAs = searchParams.get("viewAs") ?? "";
-  const repActive = searchParams.get("repActive") ?? "";
-
-  // Build query string that persists across nav
   const filterQs = useMemo(() => {
     const params = new URLSearchParams();
     if (viewAs) params.set("viewAs", viewAs);
@@ -168,33 +129,35 @@ function DashboardLayoutInner({
       : []),
   ];
 
-  function handleViewAs(repName: string) {
-    const params = new URLSearchParams(searchParams.toString());
+  const handleViewAs = useCallback((repName: string) => {
+    const params = new URLSearchParams(window.location.search);
     if (repName) {
       params.set("viewAs", repName);
     } else {
       params.delete("viewAs");
     }
+    setViewAs(repName);
     router.push(`${pathname}?${params.toString()}`);
-  }
+  }, [pathname, router]);
 
-  function handleRepActive(value: string) {
-    const params = new URLSearchParams(searchParams.toString());
+  const handleRepActive = useCallback((value: string) => {
+    const params = new URLSearchParams(window.location.search);
     if (value) {
       params.set("repActive", value);
     } else {
       params.delete("repActive");
     }
-    // Clear viewAs if switching to inactive (can't view-as an inactive rep meaningfully)
     if (value === "inactive") {
       params.delete("viewAs");
+      setViewAs("");
     }
+    setRepActive(value);
     router.push(`${pathname}?${params.toString()}`);
-  }
+  }, [pathname, router]);
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar */}
+      {/* Sidebar — completely outside Suspense */}
       <aside className="hidden md:flex w-64 flex-col bg-[#0f172a] shrink-0">
         {/* Logo */}
         <div className="p-5 border-b border-slate-800">
@@ -327,7 +290,7 @@ function DashboardLayoutInner({
         </div>
       </aside>
 
-      {/* Mobile header */}
+      {/* Mobile header — also outside Suspense */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-10 bg-[#0f172a] border-b border-slate-800">
         <div className="flex items-center justify-between p-3">
           <Link href={`/dashboard${filterQs}`} className="font-bold text-sm text-white">
@@ -398,9 +361,8 @@ function DashboardLayoutInner({
         )}
       </div>
 
-      {/* Main content */}
+      {/* Main content — Suspense only wraps the content area */}
       <main className="flex-1 bg-slate-50 p-6 md:p-8 mt-14 md:mt-0 overflow-auto">
-        {/* View-as banner */}
         {viewAs && (
           <div className="mb-4 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
             <span className="text-sm text-blue-700">
@@ -432,7 +394,16 @@ function DashboardLayoutInner({
             </button>
           </div>
         )}
-        {children}
+        <Suspense fallback={
+          <div className="flex items-center justify-center h-64">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-slate-400">Loading...</p>
+            </div>
+          </div>
+        }>
+          {children}
+        </Suspense>
       </main>
     </div>
   );

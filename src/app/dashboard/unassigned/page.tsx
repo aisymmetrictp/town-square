@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Check,
   AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 
 interface Invoice {
@@ -44,6 +45,7 @@ export default function UnassignedPage() {
   const [reassigning, setReassigning] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [filterRep, setFilterRep] = useState("");
 
   const fetchData = () => {
     setLoading(true);
@@ -81,9 +83,18 @@ export default function UnassignedPage() {
     if (!byRep[inv.repName]) byRep[inv.repName] = [];
     byRep[inv.repName].push(inv);
   }
-  const repNames = Object.keys(byRep).sort();
+  const allRepNames = Object.keys(byRep).sort();
 
-  const totalAmount = invoices.reduce(
+  // Apply filter
+  const repNames = filterRep
+    ? allRepNames.filter((name) => name === filterRep)
+    : allRepNames;
+
+  const filteredInvoices = filterRep
+    ? invoices.filter((inv) => inv.repName === filterRep)
+    : invoices;
+
+  const totalAmount = filteredInvoices.reduce(
     (s, inv) => s + Number(inv.amountDue ?? 0),
     0
   );
@@ -159,13 +170,37 @@ export default function UnassignedPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">
-          Unassigned Invoices
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Invoices under inactive reps that need reassignment
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Unassigned Invoices
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Invoices under inactive reps that need reassignment
+          </p>
+        </div>
+
+        {/* Rep filter dropdown */}
+        {allRepNames.length > 1 && (
+          <div className="relative">
+            <select
+              value={filterRep}
+              onChange={(e) => {
+                setFilterRep(e.target.value);
+                setSelected(new Set());
+              }}
+              className="appearance-none bg-white border border-slate-200 rounded-lg px-4 py-2 pr-9 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 min-w-[220px]"
+            >
+              <option value="">All Inactive Reps ({allRepNames.length})</option>
+              {allRepNames.map((name) => (
+                <option key={name} value={name}>
+                  {name} ({byRep[name].length})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+        )}
       </div>
 
       {/* Success message */}
@@ -185,10 +220,10 @@ export default function UnassignedPage() {
             </div>
             <div>
               <p className="text-xs text-slate-400 uppercase tracking-wider">
-                Unassigned Invoices
+                {filterRep ? "Invoices" : "Unassigned Invoices"}
               </p>
               <p className="text-2xl font-bold text-slate-900">
-                {invoices.length.toLocaleString()}
+                {filteredInvoices.length.toLocaleString()}
               </p>
             </div>
           </div>
@@ -215,24 +250,24 @@ export default function UnassignedPage() {
             </div>
             <div>
               <p className="text-xs text-slate-400 uppercase tracking-wider">
-                Inactive Reps
+                {filterRep ? "Viewing Rep" : "Inactive Reps"}
               </p>
               <p className="text-2xl font-bold text-slate-900">
-                {repNames.length}
+                {filterRep ? "1" : repNames.length}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {invoices.length === 0 ? (
+      {filteredInvoices.length === 0 ? (
         <div className="premium-card p-12 text-center">
           <Check size={48} className="mx-auto text-emerald-400 mb-4" />
           <p className="text-lg font-semibold text-slate-700">
-            All invoices are assigned
+            {filterRep ? `No invoices for ${filterRep}` : "All invoices are assigned"}
           </p>
           <p className="text-sm text-slate-400 mt-1">
-            No invoices under inactive reps
+            {filterRep ? "This rep has no unassigned invoices" : "No invoices under inactive reps"}
           </p>
         </div>
       ) : (
