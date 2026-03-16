@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { resolveViewAs } from "@/lib/view-as";
-import { eq, sum, count, avg, sql, desc } from "drizzle-orm";
+import { eq, sum, count, avg, sql, desc, and, SQL } from "drizzle-orm";
+import { repActiveCondition } from "@/lib/rep-active-filter";
 
 export async function GET(req: NextRequest) {
   const viewAs = await resolveViewAs(req);
@@ -27,8 +28,14 @@ export async function GET(req: NextRequest) {
     .groupBy(invoices.repName, invoices.repCode)
     .orderBy(desc(sum(invoices.amountDue)));
 
-  const rows = filterRepName
-    ? await baseQuery.where(eq(invoices.repName, filterRepName))
+  const repActive = req.nextUrl.searchParams.get("repActive") ?? "";
+  const conditions: SQL[] = [];
+  if (filterRepName) conditions.push(eq(invoices.repName, filterRepName));
+  const rac = repActiveCondition(repActive);
+  if (rac) conditions.push(rac);
+
+  const rows = conditions.length > 0
+    ? await baseQuery.where(and(...conditions))
     : await baseQuery;
 
   const result = rows.map((r) => ({

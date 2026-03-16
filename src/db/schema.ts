@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, integer, date, timestamp, json } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, numeric, integer, date, timestamp, json, boolean } from 'drizzle-orm/pg-core';
 
 export const invoices = pgTable('invoices', {
   id:             serial('id').primaryKey(),
@@ -43,6 +43,13 @@ export const contactsLog = pgTable('contacts_log', {
   repName:     text('rep_name').notNull(),
   note:        text('note'),
   contactedAt: timestamp('contacted_at').defaultNow(),
+});
+
+export const repStatus = pgTable('rep_status', {
+  id:        serial('id').primaryKey(),
+  repName:   text('rep_name').notNull().unique(),
+  isActive:  boolean('is_active').notNull().default(true),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const repUsers = pgTable('rep_users', {

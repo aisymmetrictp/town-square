@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Download, FileText } from "lucide-react";
 
 interface RiskAccount {
@@ -22,18 +23,33 @@ const fmt = (v: string | null) =>
     : "$0.00";
 
 export default function WriteOffRiskPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="flex items-center gap-3"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /><p className="text-slate-400">Loading write-off risk data...</p></div></div>}>
+      <WriteOffRiskContent />
+    </Suspense>
+  );
+}
+
+function WriteOffRiskContent() {
+  const searchParams = useSearchParams();
+  const repActive = searchParams.get("repActive") ?? "";
+  const viewAs = searchParams.get("viewAs") ?? "";
   const [accounts, setAccounts] = useState<RiskAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    fetch("/api/invoices/write-off-risk")
+    const params = new URLSearchParams();
+    if (repActive) params.set("repActive", repActive);
+    if (viewAs) params.set("viewAs", viewAs);
+    const qs = params.toString();
+    fetch(`/api/invoices/write-off-risk${qs ? `?${qs}` : ""}`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setAccounts(data);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [repActive, viewAs]);
 
   // Group by rep
   const byRep = accounts.reduce(

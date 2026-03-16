@@ -1,16 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { getCurrentRep } from "@/lib/auth";
-import { sum, count, avg, sql, desc } from "drizzle-orm";
+import { sum, count, avg, sql, desc, and, eq, SQL } from "drizzle-orm";
+import { repActiveCondition } from "@/lib/rep-active-filter";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const rep = await getCurrentRep();
   if (!rep || (rep.role !== "manager" && rep.role !== "admin")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rows = await db
+  const repActive = req.nextUrl.searchParams.get("repActive") ?? "";
+  const viewAs = req.nextUrl.searchParams.get("viewAs") ?? "";
+  const rac = repActiveCondition(repActive);
+
+  const conditions: SQL[] = [];
+  if (viewAs) conditions.push(eq(invoices.repName, viewAs));
+  if (rac) conditions.push(rac);
+
+  const baseQuery = db
     .select({
       repName: invoices.repName,
       repCode: invoices.repCode,
@@ -27,6 +36,10 @@ export async function GET() {
     .from(invoices)
     .groupBy(invoices.repName, invoices.repCode)
     .orderBy(desc(sum(invoices.paidAmount)));
+
+  const rows = conditions.length > 0
+    ? await baseQuery.where(and(...conditions))
+    : await baseQuery;
 
   const result = rows.map((r) => {
     const totalGross = Number(r.totalGross ?? 0);

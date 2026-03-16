@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   TrendingUp,
@@ -23,6 +24,17 @@ interface RepRank {
 }
 
 export default function LeaderboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="flex items-center gap-3"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /><p className="text-slate-400">Loading leaderboard...</p></div></div>}>
+      <LeaderboardContent />
+    </Suspense>
+  );
+}
+
+function LeaderboardContent() {
+  const searchParams = useSearchParams();
+  const repActive = searchParams.get("repActive") ?? "";
+  const viewAs = searchParams.get("viewAs") ?? "";
   const [reps, setReps] = useState<RepRank[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<"collectionRate" | "totalDue" | "avgDaysOverdue">(
@@ -30,27 +42,11 @@ export default function LeaderboardPage() {
   );
 
   useEffect(() => {
-    fetch("/api/invoices/rep-summary")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          // Calculate collection rate for each rep
-          const enriched = data.map((r: RepRank & { totalGross?: number; totalPaid?: number }) => ({
-            ...r,
-            collectionRate:
-              r.totalGross && r.totalGross > 0
-                ? (r.totalPaid ?? 0) / r.totalGross * 100
-                : 0,
-          }));
-          setReps(enriched);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  // We need the rep-summary to include gross/paid. Let's fetch from a richer endpoint.
-  useEffect(() => {
-    fetch("/api/leaderboard")
+    const params = new URLSearchParams();
+    if (repActive) params.set("repActive", repActive);
+    if (viewAs) params.set("viewAs", viewAs);
+    const qs = params.toString();
+    fetch(`/api/leaderboard${qs ? `?${qs}` : ""}`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -58,7 +54,7 @@ export default function LeaderboardPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [repActive, viewAs]);
 
   const sorted = [...reps].sort((a, b) => {
     if (sortBy === "collectionRate") return b.collectionRate - a.collectionRate;

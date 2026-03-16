@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { resolveViewAs } from "@/lib/view-as";
-import { eq } from "drizzle-orm";
+import { eq, and, SQL } from "drizzle-orm";
+import { repActiveCondition } from "@/lib/rep-active-filter";
 import { BUCKETS, bucketFromDays } from "@/lib/aging-buckets";
 
 export async function GET(req: NextRequest) {
@@ -19,8 +20,14 @@ export async function GET(req: NextRequest) {
     })
     .from(invoices);
 
-  const rows = filterRepName
-    ? await baseQuery.where(eq(invoices.repName, filterRepName))
+  const repActive = req.nextUrl.searchParams.get("repActive") ?? "";
+  const conditions: SQL[] = [];
+  if (filterRepName) conditions.push(eq(invoices.repName, filterRepName));
+  const rac = repActiveCondition(repActive);
+  if (rac) conditions.push(rac);
+
+  const rows = conditions.length > 0
+    ? await baseQuery.where(and(...conditions))
     : await baseQuery;
 
   const bucketMap: Record<string, number> = {};

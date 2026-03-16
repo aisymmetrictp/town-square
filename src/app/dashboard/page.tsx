@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { KPICards } from "@/components/KPICards";
 import { AgingChart, type AgingBucket } from "@/components/AgingChart";
-import { TrendingUp, ArrowRight } from "lucide-react";
+import { TrendingUp, ArrowRight, UserX } from "lucide-react";
 
 interface Summary {
   totalDue: number;
@@ -47,10 +47,12 @@ function DashboardPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const viewAs = searchParams.get("viewAs") ?? "";
+  const repActive = searchParams.get("repActive") ?? "";
   const [summary, setSummary] = useState<Summary | null>(null);
   const [aging, setAging] = useState<AgingBucket[]>([]);
   const [repData, setRepData] = useState<RepSummary[]>([]);
   const [userRole, setUserRole] = useState<string>("");
+  const [unassigned, setUnassigned] = useState<{ count: number; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [settingUp, setSettingUp] = useState(false);
@@ -59,7 +61,10 @@ function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
-    const qs = viewAs ? `?viewAs=${encodeURIComponent(viewAs)}` : "";
+    const params = new URLSearchParams();
+    if (viewAs) params.set("viewAs", viewAs);
+    if (repActive) params.set("repActive", repActive);
+    const qs = params.toString() ? `?${params.toString()}` : "";
     Promise.all([
       fetch(`/api/invoices/summary${qs}`).then((r) => {
         if (r.status === 401 || r.redirected) throw new Error("unauthorized");
@@ -94,12 +99,23 @@ function DashboardPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [viewAs]);
+
+    // Fetch unassigned totals separately (always global, for managers/admins)
+    fetch("/api/invoices/summary?repActive=inactive")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) =>
+        data
+          ? setUnassigned({ count: data.invoiceCount, total: data.totalDue })
+          : setUnassigned(null)
+      )
+      .catch(() => setUnassigned(null));
+  }, [viewAs, repActive]);
 
   function handleBucketClick(bucket: string) {
     const params = new URLSearchParams();
     params.set("bucket", bucket);
     if (viewAs) params.set("viewAs", viewAs);
+    if (repActive) params.set("repActive", repActive);
     router.push(`/dashboard/invoices?${params.toString()}`);
   }
 
@@ -176,6 +192,31 @@ function DashboardPage() {
 
       {/* KPI Cards */}
       <KPICards data={summary} />
+
+      {/* Unassigned invoices alert */}
+      {isManagerOrAdmin && unassigned && unassigned.count > 0 && (
+        <Link
+          href="/dashboard/unassigned"
+          className="premium-card p-4 mt-6 border-l-4 border-l-amber-500 flex items-center justify-between hover:bg-amber-50/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+              <UserX size={16} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                {unassigned.count.toLocaleString()} unassigned invoice
+                {unassigned.count !== 1 ? "s" : ""} &middot; $
+                {unassigned.total.toLocaleString()}
+              </p>
+              <p className="text-xs text-slate-500">
+                Invoices under inactive reps need reassignment
+              </p>
+            </div>
+          </div>
+          <ArrowRight size={16} className="text-slate-400" />
+        </Link>
+      )}
 
       {/* Chart + Quick Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">

@@ -1,18 +1,29 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { getCurrentRep } from "@/lib/auth";
-import { sum, count, avg, sql, eq, desc } from "drizzle-orm";
+import { sum, count, avg, sql, eq, desc, and, SQL } from "drizzle-orm";
 import { bucketFromDays } from "@/lib/aging-buckets";
+import { repActiveCondition } from "@/lib/rep-active-filter";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const rep = await getCurrentRep();
   if (!rep || (rep.role !== "manager" && rep.role !== "admin")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const repActive = req.nextUrl.searchParams.get("repActive") ?? "";
+  const viewAs = req.nextUrl.searchParams.get("viewAs") ?? "";
+  const rac = repActiveCondition(repActive);
+
+  // Build combined filter from viewAs + repActive
+  const filterConditions: SQL[] = [];
+  if (viewAs) filterConditions.push(eq(invoices.repName, viewAs));
+  if (rac) filterConditions.push(rac);
+  const combinedFilter = filterConditions.length > 0 ? and(...filterConditions) : undefined;
+
   // 1. Cohort analysis by snapshot date
-  const cohorts = await db
+  const cohortsQuery = db
     .select({
       snapshotDate: invoices.snapshotDate,
       totalGross: sum(invoices.grossPrice),
@@ -24,6 +35,8 @@ export async function GET() {
     .from(invoices)
     .groupBy(invoices.snapshotDate)
     .orderBy(desc(invoices.snapshotDate));
+
+  const cohorts = combinedFilter ? await cohortsQuery.where(combinedFilter) : await cohortsQuery;
 
   const cohortData = cohorts.map((c) => {
     const gross = Number(c.totalGross ?? 0);
@@ -40,7 +53,7 @@ export async function GET() {
   });
 
   // 2. Forecast: historical collection rates by aging bucket
-  const allInvoices = await db
+  const allInvQuery = db
     .select({
       daysOverdue: invoices.daysOverdue,
       amountDue: invoices.amountDue,
@@ -49,6 +62,8 @@ export async function GET() {
       paidStatus: invoices.paidStatus,
     })
     .from(invoices);
+
+  const allInvoices = combinedFilter ? await allInvQuery.where(combinedFilter) : await allInvQuery;
 
   // Group by bucket and calculate collection rates
   const bucketStats: Record<
@@ -101,7 +116,7 @@ export async function GET() {
   };
 
   // 3. Rep scorecard: current rate vs 90-day average
-  const repStats = await db
+  const repStatsQuery = db
     .select({
       repName: invoices.repName,
       repCode: invoices.repCode,
@@ -113,6 +128,8 @@ export async function GET() {
     })
     .from(invoices)
     .groupBy(invoices.repName, invoices.repCode);
+
+  const repStats = combinedFilter ? await repStatsQuery.where(combinedFilter) : await repStatsQuery;
 
   const repScores = repStats.map((r) => {
     const gross = Number(r.totalGross ?? 0);

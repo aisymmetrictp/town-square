@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   BarChart3,
   TrendingUp,
+  UserX,
 } from "lucide-react";
 
 interface UserInfo {
@@ -52,6 +53,7 @@ function DashboardLayoutInner({
   const [user, setUser] = useState<UserInfo | null>(null);
   const [reps, setReps] = useState<Rep[]>([]);
   const viewAs = searchParams.get("viewAs") ?? "";
+  const repActive = searchParams.get("repActive") ?? "";
 
   const isAdmin = user?.role === "admin";
   const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
@@ -65,6 +67,7 @@ function DashboardLayoutInner({
           { href: "/dashboard/leaderboard", label: "Leaderboard", icon: Trophy },
           { href: "/dashboard/write-off-risk", label: "Write-Off Risk", icon: AlertTriangle },
           { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+          { href: "/dashboard/unassigned", label: "Unassigned", icon: UserX },
         ]
       : []),
     ...(isAdmin
@@ -96,6 +99,16 @@ function DashboardLayoutInner({
       params.set("viewAs", repName);
     } else {
       params.delete("viewAs");
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  function handleRepActive(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set("repActive", value);
+    } else {
+      params.delete("repActive");
     }
     router.push(`${pathname}?${params.toString()}`);
   }
@@ -168,6 +181,34 @@ function DashboardLayoutInner({
                 ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            </div>
+          </div>
+        )}
+
+        {/* Rep Status filter */}
+        {isManagerOrAdmin && (
+          <div className="px-3 pb-3">
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-4 mb-2">
+              Rep Status
+            </p>
+            <div className="flex gap-1 px-1">
+              {[
+                { value: "", label: "All" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleRepActive(opt.value)}
+                  className={`flex-1 text-[11px] py-1.5 rounded-md font-medium transition-colors ${
+                    repActive === opt.value
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
         )}

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { resolveViewAs } from "@/lib/view-as";
 import { eq, and, lte, gt, gte, desc, SQL } from "drizzle-orm";
+import { repActiveCondition } from "@/lib/rep-active-filter";
 
 function bucketToCondition(bucket: string): SQL | undefined {
   switch (bucket) {
@@ -35,6 +36,8 @@ export async function GET(req: NextRequest) {
   const bucket = searchParams.get("bucket") ?? "";
   const status = searchParams.get("status") ?? "";
 
+  const repActive = searchParams.get("repActive") ?? "";
+
   const conditions: SQL[] = [];
   if (filterRepName) {
     conditions.push(eq(invoices.repName, filterRepName));
@@ -46,6 +49,8 @@ export async function GET(req: NextRequest) {
   if (status) {
     conditions.push(eq(invoices.paidStatus, status));
   }
+  const rac = repActiveCondition(repActive);
+  if (rac) conditions.push(rac);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 

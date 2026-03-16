@@ -74,6 +74,7 @@ export default function InvoicesPageWrapper() {
 function InvoicesPage() {
   const searchParams = useSearchParams();
   const viewAs = searchParams.get("viewAs") ?? "";
+  const repActive = searchParams.get("repActive") ?? "";
   const urlBucket = searchParams.get("bucket") ?? "";
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,11 +91,12 @@ function InvoicesPage() {
     if (bucket) params.set("bucket", bucket);
     if (status) params.set("status", status);
     if (viewAs) params.set("viewAs", viewAs);
+    if (repActive) params.set("repActive", repActive);
     fetch(`/api/invoices?${params}`)
       .then((r) => r.json())
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
-  }, [bucket, status, viewAs]);
+  }, [bucket, status, viewAs, repActive]);
 
   useEffect(() => {
     fetchData();

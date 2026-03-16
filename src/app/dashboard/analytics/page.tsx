@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   BarChart,
   Bar,
@@ -87,15 +88,30 @@ const BUCKET_COLORS: Record<string, string> = {
 };
 
 export default function AnalyticsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="flex items-center gap-3"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /><p className="text-slate-400">Loading analytics...</p></div></div>}>
+      <AnalyticsContent />
+    </Suspense>
+  );
+}
+
+function AnalyticsContent() {
+  const searchParams = useSearchParams();
+  const repActive = searchParams.get("repActive") ?? "";
+  const viewAs = searchParams.get("viewAs") ?? "";
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/analytics")
+    const params = new URLSearchParams();
+    if (repActive) params.set("repActive", repActive);
+    if (viewAs) params.set("viewAs", viewAs);
+    const qs = params.toString();
+    fetch(`/api/analytics${qs ? `?${qs}` : ""}`)
       .then((r) => r.json())
       .then((d) => setData(d))
       .finally(() => setLoading(false));
-  }, []);
+  }, [repActive, viewAs]);
 
   if (loading) {
     return (

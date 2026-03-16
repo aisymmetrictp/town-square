@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import { resolveViewAs } from "@/lib/view-as";
-import { eq, sum, count, avg, sql } from "drizzle-orm";
+import { eq, sum, count, avg, sql, and, SQL } from "drizzle-orm";
+import { repActiveCondition } from "@/lib/rep-active-filter";
 
 export async function GET(req: NextRequest) {
   const viewAs = await resolveViewAs(req);
@@ -25,8 +26,14 @@ export async function GET(req: NextRequest) {
     })
     .from(invoices);
 
-  const query = filterRepName
-    ? baseQuery.where(eq(invoices.repName, filterRepName))
+  const repActive = req.nextUrl.searchParams.get("repActive") ?? "";
+  const conditions: SQL[] = [];
+  if (filterRepName) conditions.push(eq(invoices.repName, filterRepName));
+  const rac = repActiveCondition(repActive);
+  if (rac) conditions.push(rac);
+
+  const query = conditions.length > 0
+    ? baseQuery.where(and(...conditions))
     : baseQuery;
 
   const [result] = await query;
