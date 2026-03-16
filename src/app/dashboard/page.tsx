@@ -31,16 +31,18 @@ function DashboardPage() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [settingUp, setSettingUp] = useState(false);
 
-  function loadData() {
+  useEffect(() => {
     setLoading(true);
     const qs = viewAs ? `?viewAs=${encodeURIComponent(viewAs)}` : "";
     Promise.all([
       fetch(`/api/invoices/summary${qs}`).then((r) => {
-        if (r.status === 401) throw new Error("unauthorized");
+        if (r.status === 401 || r.redirected) throw new Error("unauthorized");
+        if (!r.ok) throw new Error("api-error");
         return r.json();
       }),
       fetch(`/api/invoices/aging${qs}`).then((r) => {
-        if (r.status === 401) throw new Error("unauthorized");
+        if (r.status === 401 || r.redirected) throw new Error("unauthorized");
+        if (!r.ok) throw new Error("api-error");
         return r.json();
       }),
     ])
@@ -49,14 +51,15 @@ function DashboardPage() {
         setAging(agingData);
         setNeedsSetup(false);
       })
-      .catch(() => {
-        setNeedsSetup(true);
+      .catch((err) => {
+        if (err.message === "unauthorized") {
+          setNeedsSetup(true);
+        } else {
+          setSummary(null);
+          setNeedsSetup(false);
+        }
       })
       .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    loadData();
   }, [viewAs]);
 
   async function handleSetup() {
@@ -65,7 +68,7 @@ function DashboardPage() {
       const res = await fetch("/api/setup", { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        loadData();
+        window.location.reload();
       } else {
         alert(data.error || "Setup failed");
       }
